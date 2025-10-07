@@ -4,10 +4,12 @@
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv)
 {
 
-  //  auto gameLayer = CreateRef<Editor::EditorGameLayer>();
-  //  Ref<Game::UILayer> uilayer = DynamicCast<Game::UILayer, Ref<Editor::EditorGameLayer>>(gameLayer);
+    (void)appstate; (void)argc; (void)argv;
 
-	auto uilayer = Game::CreateInitialGameLayer(true);
+    //  auto gameLayer = CreateRef<Editor::EditorGameLayer>();
+    //  Ref<Game::UILayer> uilayer = DynamicCast<Game::UILayer, Ref<Editor::EditorGameLayer>>(gameLayer);
+
+    auto uilayer = Game::CreateInitialGameLayer(true);
 
     if (!Game::initGame("settings.json")) {
         std::cout << "Game initialization failed." << std::endl;

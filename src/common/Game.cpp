@@ -12,6 +12,7 @@ struct GameState {
 static GameState g_GameState{};
 bool Game::initGame(const char* settings)
 {
+	(void)settings;
 	if (!Renderer::initRenderer(1024,768)) {
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Renderer initialization failed.");
 		return false;
@@ -88,8 +89,8 @@ void Game::handleEvent(SDL_Event* event)
 	switch (event->type) {
 	case SDL_EventType::SDL_EVENT_WINDOW_RESIZED:
 		g_GameState._gameEvents.type = GameEvents::EventType::WindowResize;
-		g_GameState._gameEvents.windowResize.width = event->display.data1;
-		g_GameState._gameEvents.windowResize.height = event->display.data2;
+		g_GameState._gameEvents.windowResize.width = static_cast<int>(event->display.data1);
+		g_GameState._gameEvents.windowResize.height = static_cast<int>(event->display.data2);
 		break;
 	case SDL_EventType::SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 		g_GameState._gameEvents.type = GameEvents::EventType::WindowClose;
@@ -107,8 +108,8 @@ void Game::handleEvent(SDL_Event* event)
 		g_GameState._gameEvents.type = GameEvents::EventType::MouseButtonRelease;
 		g_GameState._gameEvents.mouseButtonEvent.numClicks = event->button.clicks;
 		g_GameState._gameEvents.mouseButtonEvent.button = ToMouseButton(event->button.button);
-		g_GameState._gameEvents.mouseButtonEvent.x = event->button.x;
-		g_GameState._gameEvents.mouseButtonEvent.y = event->button.y;
+		g_GameState._gameEvents.mouseButtonEvent.x = static_cast<int>(event->button.x);
+		g_GameState._gameEvents.mouseButtonEvent.y = static_cast<int>(event->button.y);
 		break;
 	case SDL_EventType::SDL_EVENT_MOUSE_BUTTON_DOWN:
 		g_GameState._gameEvents.mouseButtonEvent.numClicks = event->button.clicks;
@@ -119,19 +120,19 @@ void Game::handleEvent(SDL_Event* event)
 			g_GameState._gameEvents.type = GameEvents::EventType::MouseButtonPress;
 		}
 		g_GameState._gameEvents.mouseButtonEvent.button = ToMouseButton(event->button.button);
-		g_GameState._gameEvents.mouseButtonEvent.x = event->button.x;
-		g_GameState._gameEvents.mouseButtonEvent.y = event->button.y;
+		g_GameState._gameEvents.mouseButtonEvent.x = static_cast<int>(event->button.x);
+		g_GameState._gameEvents.mouseButtonEvent.y = static_cast<int>(event->button.y);
 		break;
 	case SDL_EventType::SDL_EVENT_MOUSE_MOTION:
 		g_GameState._gameEvents.mouseButtonEvent.numClicks = event->button.clicks;
 		g_GameState._gameEvents.type = GameEvents::EventType::MouseMove;
-		g_GameState._gameEvents.mouseMoveEvent.x = event->motion.x;
-		g_GameState._gameEvents.mouseMoveEvent.y = event->motion.y;
+		g_GameState._gameEvents.mouseMoveEvent.x = static_cast<int>(event->motion.x);
+		g_GameState._gameEvents.mouseMoveEvent.y = static_cast<int>(event->motion.y);
 		break;
 	case SDL_EventType::SDL_EVENT_MOUSE_WHEEL:
 		g_GameState._gameEvents.type = GameEvents::EventType::MouseScroll;
-		g_GameState._gameEvents.mouseScrollEvent.deltaX = event->wheel.x;
-		g_GameState._gameEvents.mouseScrollEvent.deltaY = event->wheel.y;
+		g_GameState._gameEvents.mouseScrollEvent.deltaX = static_cast<int>(event->wheel.x);
+		g_GameState._gameEvents.mouseScrollEvent.deltaY = static_cast<int>(event->wheel.y);
 		break;
 	default:
 		return; // Unhandled event type

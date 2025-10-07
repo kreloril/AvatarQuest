@@ -1,4 +1,4 @@
-#include "AvatarQuest/AvatarQuestLayer.h"
+#include "AvatarQuestLayer.h"
 
 namespace AvatarQuest {
 
@@ -6,7 +6,6 @@ AvatarQuestLayer::AvatarQuestLayer() {}
 AvatarQuestLayer::~AvatarQuestLayer() {}
 
 void AvatarQuestLayer::init() {}
-void AvatarQuestLayer::update(float /*deltaTime*/) {}
 void AvatarQuestLayer::render(float /*deltaTime*/) {}
 void AvatarQuestLayer::shutDown() {}
 

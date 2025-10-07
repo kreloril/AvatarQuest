@@ -5,7 +5,7 @@
 
 #include <memory>
 
-namespace Game { struct UILayer; }
+namespace Game { class UILayer; }
 
 namespace AvatarQuest {
 

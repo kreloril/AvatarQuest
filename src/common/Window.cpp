@@ -11,10 +11,11 @@ bool Window::createWindow(int width, int height, const char* title)
         destroyWindow();
     }
 
+    (void)width; (void)height;
     SDL_Rect desktop = { 0 };
     SDL_GetDisplayBounds(SDL_GetPrimaryDisplay(), &desktop);
 
-	g_WindowState = SDL_CreateWindow(title, desktop.w, desktop.h, SDL_WINDOW_BORDERLESS);
+    g_WindowState = SDL_CreateWindow(title, desktop.w, desktop.h, SDL_WINDOW_BORDERLESS);
     if (g_WindowState == nullptr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Could not create window: %s", SDL_GetError());
 
@@ -59,11 +60,6 @@ bool Window::runMainLoop()
         return false;
     }
 
-    bool quit = false;
-    if (!g_WindowState) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Window not created.");
-        return false;
-    }
 
     // Single frame update for callback environment
     static uint64_t last = SDL_GetTicks();
