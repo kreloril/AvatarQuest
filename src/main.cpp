@@ -1,15 +1,13 @@
+
 #include "common.h"
-#include "Game.h"
 #include "AvatarQuestLayer.h"
-#include "common.h"
-#include "Game.h"
 
 namespace Game {
 
-    Ref<Game::UILayer> CreateInitialGameLayer(bool a)
+    Ref<Game::UILayer> CreateInitialGameLayer(bool /*enableIMGui*/)
     {
         return AvatarQuest::CreateAvatarQuestLayer();
     }
 
 }
-int main(int argc, char** argv)
+
