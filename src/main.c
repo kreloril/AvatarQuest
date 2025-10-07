@@ -1,6 +1,5 @@
 #include <SDL3/SDL.h>
-#include "AvatarQuest/game.h"
-#include "AvatarQuest/platform.h"
+#include "AvatarQuest/engine.h"
 
 int main(int argc, char *argv[]) {
     (void)argc;

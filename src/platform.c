@@ -1,5 +1,4 @@
-#include "AvatarQuest/platform.h"
-#include "AvatarQuest/game.h"
+#include "AvatarQuest/engine.h"
 
 #include <SDL3/SDL.h>
 
