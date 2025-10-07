@@ -1,0 +1,17 @@
+# Build directories
+/build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.vcxproj*
+*.sln
+
+# IDE settings
+.vscode/
+.idea/
+.DS_Store
+
+# Executables and logs
+AvatarQuest
+*.log
