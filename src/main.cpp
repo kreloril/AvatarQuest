@@ -1,6 +1,6 @@
 
 #include "common.h"
-#include "AvatarQuestLayer.h"
+#include "AvatarQuest/AvatarQuest.h"
 
 namespace Game {
 
