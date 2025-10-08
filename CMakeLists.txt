@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.24)
 
 project(AvatarQuest VERSION 0.1.0 LANGUAGES C CXX)
 
+# Make find_package honor <PackageName>_ROOT variables (helps find ZLIB_ROOT/PNG_ROOT when set)
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
+
 
 
 set(CMAKE_CXX_STANDARD 20)
@@ -85,6 +90,34 @@ macro(_fetch_or_find_sdl3 name repo_var git_repo git_tag vendor_option)
 endmacro()
 
 # Try to find or vendor SDL_image, SDL_mixer, SDL_ttf
+
+# Configure a few SDL_image vendoring options to avoid heavy build deps (dav1d/asms)
+if(NOT DEFINED SDLIMAGE_AVIF)
+    set(SDLIMAGE_AVIF OFF CACHE BOOL "Disable AVIF support in vendored SDL_image to avoid nasm/dav1d" FORCE)
+endif()
+if(NOT DEFINED SDLIMAGE_DAV1D)
+    set(SDLIMAGE_DAV1D OFF CACHE BOOL "Disable dav1d vendoring" FORCE)
+endif()
+if(NOT DEFINED SDLIMAGE_AOM)
+    set(SDLIMAGE_AOM OFF CACHE BOOL "Disable aom vendoring" FORCE)
+endif()
+
+## NOTE: SDL3_image can use system image libraries (zlib, libpng, libjpeg, libtiff, giflib).
+## Vendoring those projects reliably inside this top-level configure is fragile because
+## some of them (libpng, libtiff, libjpeg-turbo) expect zlib or other system deps to be
+## available at configure-time. If you want SDL3_image to use external libs, provide
+## them via one of these approaches:
+##  - Install dev packages on the system and ensure they are on PATH/standard include/lib locations.
+##  - Use vcpkg and pass -DCMAKE_TOOLCHAIN_FILE=<vcpkg_root>/scripts/buildsystems/vcpkg.cmake to cmake.
+##  - Manually set ZLIB_ROOT, PNG_PNG_INCLUDE_DIR, PNG_LIBRARY, JPEG_LIBRARY, TIFF_LIBRARY, GIF_LIBRARY
+##    in the CMake cache to point to prebuilt libraries before running configure.
+##
+## If you prefer, we can add FetchContent for those libraries and attempt to wire up their
+## CMake variables automatically — but that is error-prone on Windows (zlib/libpng need
+## to be built first so find_package() can locate them). Ask me if you'd like me to try
+## a vcpkg-based integration or an automatic FetchContent+install flow.
+
+# Try to find or vendor SDL_image, SDL_mixer, SDL_ttf
 _fetch_or_find_sdl3(SDL3_image SDL3_IMAGE_REPO https://github.com/libsdl-org/SDL_image.git main AVATARQUEST_VENDOR_SDL_IMAGE)
 _fetch_or_find_sdl3(SDL3_mixer SDL3_MIXER_REPO https://github.com/libsdl-org/SDL_mixer.git main AVATARQUEST_VENDOR_SDL_MIXER)
 _fetch_or_find_sdl3(SDL3_ttf SDL3_TTF_REPO https://github.com/libsdl-org/SDL_ttf.git main AVATARQUEST_VENDOR_SDL_TTF)
@@ -109,7 +142,13 @@ target_include_directories(AvatarQuest
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/src/common
     ${PROJECT_SOURCE_DIR}/external/Imgui
+        # Add stb single-header library include path
+        ${PROJECT_SOURCE_DIR}/external/stb
+
+
 )
+
+# Add stb single-header library was here; removed (stb fallback removed)
 
 target_link_libraries(AvatarQuest PRIVATE SDL3::SDL3)
 
