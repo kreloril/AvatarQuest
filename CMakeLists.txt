@@ -4,6 +4,9 @@ project(AvatarQuest)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Optionally enable unit tests (Catch2)
+option(AVATARQUEST_ENABLE_TESTS "Build unit tests with Catch2" ON)
+
 # Engine source files
 file(GLOB ENGINE_SRC
     "${CMAKE_SOURCE_DIR}/common/*.cpp"
@@ -59,7 +62,8 @@ add_subdirectory(external/SDL)
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/common
-      ${CMAKE_SOURCE_DIR}/external/Imgui
+    ${CMAKE_SOURCE_DIR}/external/Imgui
+    ${CMAKE_SOURCE_DIR}/external/stb
     ${CMAKE_SOURCE_DIR}/external/SDL/include
     ${CMAKE_BINARY_DIR}/external/SDL/Debug
     ${CMAKE_BINARY_DIR}/external/SDL/Release
@@ -113,4 +117,16 @@ opengl32
             "$<TARGET_FILE:SDL3-shared>"
             "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
     )
+endif()
+
+# -----------------------------
+# Tests (Catch2)
+# -----------------------------
+if (AVATARQUEST_ENABLE_TESTS)
+    include(CTest)
+    enable_testing()
+    # Make Catch2 available via a small FetchContent wrapper
+    add_subdirectory(external/Catch2)
+    # Add our tests directory
+    add_subdirectory(tests)
 endif()

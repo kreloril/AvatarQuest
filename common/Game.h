@@ -49,6 +49,11 @@ namespace Game
 		bool isMouseButton(Game::GameEvents::MouseButton btn) const {
 			return (type == EventType::MouseButtonPress || type == EventType::MouseButtonRelease || type == EventType::MouseButtonDoubleClick) && mouseButtonEvent.button == btn;
 		}
+
+		void reset() {
+			type = EventType::None;
+			std::memset(&mouseButtonEvent, 0, sizeof(mouseButtonEvent));
+		}
 	};
 
 	bool initGame(const char* settings);

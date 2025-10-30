@@ -179,6 +179,35 @@ void Renderer::drawThickLine(float x1, float y1, float x2, float y2, float thick
     return;
 }
 
+void Renderer::drawImage(Vector2 position, Vector2 scale, float rotation, Ref<Image> img, Color tint)
+{
+    if (!img || !img->texture) return;
+    SDL_FRect destRect;
+    destRect.w = img->imageRect.w * scale.x;
+    destRect.h = img->imageRect.h * scale.y;
+    destRect.x = position.x - destRect.w * 0.5f; // Centered
+    destRect.y = position.y - destRect.h * 0.5f; // Centered
+    SDL_SetTextureColorMod(img->texture, tint.r, tint.g, tint.b);
+    SDL_SetTextureAlphaMod(img->texture, tint.a);
+	SDL_FPoint center = { (img->imageRect.w * 0.5f), (img->imageRect.h * 0.5f) };
+	SDL_RenderTextureRotated(g_RenderState.sdlRenderer, img->texture, &img->imageRect, &destRect, rotation, &center, SDL_FLIP_NONE);
+    //SDL_RenderCopyExF(g_RenderState.sdlRenderer, img->texture, &img->imageRect, &destRect, rotation, nullptr, SDL_FLIP_NONE);
+}
+
+void Renderer::drawImageFromRect(Vector2 position, Vector2 scale, float rotation, Ref<Image> img, const SDL_FRect& tileRect, Color tint)
+{
+    if (!img || !img->texture) return;
+    SDL_FRect destRect;
+    destRect.w = tileRect.w * scale.x;
+    destRect.h = tileRect.h * scale.y;
+    destRect.x = position.x - destRect.w * 0.5f; // Centered
+    destRect.y = position.y - destRect.h * 0.5f; // Centered
+    SDL_SetTextureColorMod(img->texture, tint.r, tint.g, tint.b);
+    SDL_SetTextureAlphaMod(img->texture, tint.a);
+    SDL_FPoint center = { (tileRect.w * 0.5f), (tileRect.h * 0.5f) };
+    SDL_RenderTextureRotated(g_RenderState.sdlRenderer, img->texture, &tileRect, &destRect, rotation, &center, SDL_FLIP_NONE);
+}
+
 bool Renderer::drawRect(float x, float y, float width, float height, Color color)
 {
     if (g_RenderState.commandCount + 1 >= MAX_RENDER_COMMANDS) {

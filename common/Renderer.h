@@ -39,6 +39,8 @@ namespace  Renderer
 	bool drawFilledRect(float x, float y, float width, float height, Color color);
 	bool drawRect(float x, float y, float width, float height, Color color);
 	void drawThickLine(float x1, float y1, float x2, float y2, float thickness, Color color);
+	void drawImage(Vector2 position, Vector2 scale, float rotation, Ref<Image> img, Color tint = {255,255,255,255});
+	void drawImageFromRect(Vector2 position, Vector2 scale, float rotation, Ref<Image> img, const SDL_FRect& tileRect, Color tint = { 255,255,255,255 });
 	void beginRender();
 	void endRender();
 	void setClearColor(Color color);

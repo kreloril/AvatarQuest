@@ -215,3 +215,18 @@ struct Vector2 {
 
 
 };
+
+namespace std {
+    template<>
+    struct hash<Vector2> {
+        std::size_t operator()(const Vector2& v) const noexcept {
+            // Combine x and y into one hash.
+            // reinterpret as uint32_t for stability
+            std::size_t hx = std::hash<float>{}(v.x);
+            std::size_t hy = std::hash<float>{}(v.y);
+
+            // A simple but effective mix
+            return hx ^ (hy + 0x9e3779b9 + (hx << 6) + (hx >> 2));
+        }
+    };
+}

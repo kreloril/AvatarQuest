@@ -1,5 +1,6 @@
 # Build directories
 /build/
+/**/build/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
@@ -7,10 +8,27 @@ Makefile
 *.vcxproj*
 *.sln
 
+# Binaries and outputs
+/bin/
+/**/bin/
+/_deps/
+*.exe
+*.dll
+*.lib
+*.exp
+*.obj
+*.pdb
+*.ilk
+
+# Test logs
+*.tap.txt
+build/test_logs/
+
 # IDE settings
 .vscode/
 .idea/
 .DS_Store
+Thumbs.db
 
 # Executables and logs
 AvatarQuest
