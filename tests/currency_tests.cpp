@@ -14,46 +14,52 @@ static std::string bundleToString(const CurrencyBundle& b) {
     };
     char buf[256];
     std::snprintf(buf, sizeof(buf),
-        "P:%lld G:%lld S:%lld C:%lld | totalC:%lld | tileID:%d",
-        (long long)count(CurrencyType::Platinum),
+        "Gold:%lld Food:%lld | totalValue:%lld | tileID:%d",
         (long long)count(CurrencyType::Gold),
-        (long long)count(CurrencyType::Silver),
-        (long long)count(CurrencyType::Copper),
+        (long long)count(CurrencyType::Food),
         (long long)toCopperTotal(b),
         b.tileID);
     return std::string(buf);
 }
 
-TEST_CASE("Currency: normalize and totals", "[currency]") {
+TEST_CASE("Currency: gold totals and spend", "[currency]") {
     CurrencyBundle b{};
-    // 3 gold, 5 silver, 250 copper -> normalize should carry 250c -> 2s 50c
-    createPurse(/*platinum*/0, /*gold*/3, /*silver*/5, /*copper*/250, b);
-    WARN("After normalize: " << bundleToString(b));
-    // Totals in copper: 3*10000 + 7*100 + 50 = 30000 + 700 + 50 = 30750
-    REQUIRE(toCopperTotal(b) == 30750);
+    createCurrency(CurrencyType::Gold, 3, /*tile*/-1, b);
+    WARN("After create: " << bundleToString(b));
+    REQUIRE(toCopperTotal(b) == 3);
+    REQUIRE(spendCopper(b, 2) == true);
+    WARN("After spend2: " << bundleToString(b));
+    REQUIRE(toCopperTotal(b) == 1);
+    REQUIRE(spendCopper(b, 2) == false);
 }
 
-TEST_CASE("Currency: add and spend by copper", "[currency]") {
-    CurrencyBundle wallet{}; createPurse(0,1,0,0, wallet); // 1 gold = 10000 c
-    WARN("Initial:  " << bundleToString(wallet));
-    REQUIRE(toCopperTotal(wallet) == 10000);
-    // Spend 9999 copper
-    REQUIRE(spendCopper(wallet, 9999) == true);
-    WARN("Post-9999: " << bundleToString(wallet));
-    REQUIRE(toCopperTotal(wallet) == 1); // 1 copper remains
-    // Can't spend more than we have
-    REQUIRE(spendCopper(wallet, 2) == false);
+TEST_CASE("Currency: food exact spend and affordability", "[currency]") {
+    CurrencyBundle wallet{}; createPurse(/*gold*/0, /*food*/5, 0, 0, wallet);
+    CurrencyBundle eat{};    createPurse(/*gold*/0, /*food*/2, 0, 0, eat);
+    WARN("Wallet: " << bundleToString(wallet));
+    WARN("Eat:    " << bundleToString(eat));
+    REQUIRE(canAfford(wallet, eat));
+    REQUIRE(spendBundle(wallet, eat));
+    WARN("After:  " << bundleToString(wallet));
+    // Value unchanged (food doesn't add to value), but food count reduced
+    REQUIRE(toCopperTotal(wallet) == 0);
+    // Spend more food than available should fail
+    CurrencyBundle tooMuch{}; createPurse(0, 4, 0, 0, tooMuch);
+    REQUIRE(!canAfford(wallet, tooMuch));
 }
 
-TEST_CASE("Currency: canAfford and spendBundle", "[currency]") {
-    CurrencyBundle wallet{}; createPurse(0,0,50,0, wallet); // 50 silver = 5000 c
-    CurrencyBundle cost{};   createPurse(0,0,10,75, cost);  // 10 s 75 c = 1075 c
+TEST_CASE("Currency: mixed costs (gold + food)", "[currency]") {
+    CurrencyBundle wallet{}; createPurse(10, 1, 0, 0, wallet); // 10 gold, 1 food
+    CurrencyBundle cost{};   createPurse(5, 1, 0, 0, cost);    // 5 gold, 1 food
     WARN("Wallet: " << bundleToString(wallet));
     WARN("Cost:   " << bundleToString(cost));
     REQUIRE(canAfford(wallet, cost));
     REQUIRE(spendBundle(wallet, cost));
     WARN("After:  " << bundleToString(wallet));
-    REQUIRE(toCopperTotal(wallet) == 5000 - 1075);
+    REQUIRE(toCopperTotal(wallet) == 5);
+    // Another food needed but none remains
+    CurrencyBundle needFood{}; createPurse(0, 1, 0, 0, needFood);
+    REQUIRE(!canAfford(wallet, needFood));
 }
 
 TEST_CASE("Currency: random purse scales with level on average", "[currency][random]") {
@@ -77,15 +83,16 @@ TEST_CASE("Currency: sheet wallet add/spend integrates", "[currency][sheet]") {
     WARN("Initial wallet: " << bundleToString(getWallet(cs)));
     REQUIRE(toCopperTotal(getWallet(cs)) == 0);
     // Add some funds
-    addFunds(cs, CurrencyType::Gold, 1); // 10,000 copper
-    WARN("After add G1:  " << bundleToString(getWallet(cs)));
-    REQUIRE(toCopperTotal(getWallet(cs)) == 10000);
-    // Spend
-    CurrencyBundle cost{}; createPurse(0,0,5,50, cost); // 5s 50c = 550c
+    addFunds(cs, CurrencyType::Gold, 10);
+    addFunds(cs, CurrencyType::Food, 3);
+    WARN("After add:      " << bundleToString(getWallet(cs)));
+    REQUIRE(toCopperTotal(getWallet(cs)) == 10);
+    // Spend mixed
+    CurrencyBundle cost{}; createPurse(2,1,0,0, cost); // 2 gold + 1 food
     WARN("Spend cost:     " << bundleToString(cost));
     REQUIRE(spendFunds(cs, cost));
     WARN("After spend:    " << bundleToString(getWallet(cs)));
-    REQUIRE(toCopperTotal(getWallet(cs)) == 10000 - 550);
+    REQUIRE(toCopperTotal(getWallet(cs)) == 8);
     // Tile stays as default unless explicitly set
     REQUIRE(getWallet(cs).tileID == -1);
     getWallet(cs).tileID = 123;
