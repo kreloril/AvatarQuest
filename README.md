@@ -16,14 +16,14 @@ AvatarQuest/
 ├── include/
 │   └── AvatarQuest/    # Public headers for the game modules
 ├── scripts/            # Utility scripts for tooling and automation
-├── src/                # C source files for the game and platform layer
+├── src/                # C++ source files for the engine, platform, and layers
 ├── CMakeLists.txt      # Build configuration
 └── README.md
 ```
 
 ## Prerequisites
 
-* A C17-capable compiler (GCC, Clang, or MSVC).
+* A C++20-capable compiler (MSVC, Clang, or GCC).
 * [CMake](https://cmake.org/) 3.24 or newer.
 * SDL3 development libraries available on your system. The build script expects `find_package(SDL3 CONFIG REQUIRED)` to succeed, which typically means SDL3 was installed using the official CMake package configuration.
 
@@ -89,9 +89,14 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DAVATARQUEST_VENDOR_SDL3=
 
 ## Building
 
-```bash
+```powershell
+# Cross-platform (single-config generators):
 cmake -S . -B build
 cmake --build build
+
+# Windows + Visual Studio (multi-config):
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Debug
 ```
 
 On success, the `AvatarQuest` executable will be placed in the build output directory.
@@ -100,11 +105,15 @@ On success, the `AvatarQuest` executable will be placed in the build output dire
 
 From the repository root:
 
-```bash
+```powershell
+# Single-config builds
 ./build/AvatarQuest
+
+# Visual Studio multi-config builds
+./build/Debug/AvatarQuest.exe
 ```
 
-A window titled **AvatarQuest** should appear with a placeholder hero sprite represented by a golden square. Press <kbd>Esc</kbd> or close the window to exit.
+A window titled **AvatarQuest** should appear. Press Esc or close the window to exit.
 
 ## Next Steps
 

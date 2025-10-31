@@ -16,6 +16,8 @@ set(AQ_TEST_PRODUCT_SOURCES
     ${CMAKE_SOURCE_DIR}/AvatarQuest/AvatarQuestNaming.cpp
     ${CMAKE_SOURCE_DIR}/AvatarQuest/AvatarQuestSkills.cpp
     ${CMAKE_SOURCE_DIR}/AvatarQuest/AvatarQuestRP.cpp
+    ${CMAKE_SOURCE_DIR}/AvatarQuest/AvatarQuestCurrency.cpp
+    ${CMAKE_SOURCE_DIR}/common/Random.cpp
 )
 
 find_package(Catch2 3 CONFIG QUIET)
@@ -32,6 +34,10 @@ function(aq_add_test_exe NAME)
     target_link_libraries(${NAME} PRIVATE ${AQ_CATCH_TARGET} SDL3-shared)
     target_sources(${NAME} PRIVATE ${AQ_TEST_PRODUCT_SOURCES})
     target_compile_definitions(${NAME} PRIVATE AQ_BUILD_TESTS=1)
+    # Avoid MSVC PDB write contention when building tests in parallel
+    if (MSVC)
+        target_compile_options(${NAME} PRIVATE /FS)
+    endif()
     add_test(NAME ${NAME} COMMAND ${NAME})
 endfunction()
 
@@ -44,3 +50,4 @@ aq_add_test_exe(aq_tests_equipment      equipment_bonus_tests.cpp)
 aq_add_test_exe(aq_tests_leveling       leveling_tests.cpp)
 aq_add_test_exe(aq_tests_naming         naming_tests.cpp)
 aq_add_test_exe(aq_tests_misc           sample_test.cpp player_camera_tests.cpp)
+aq_add_test_exe(aq_tests_currency       currency_tests.cpp)
