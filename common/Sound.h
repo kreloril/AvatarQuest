@@ -34,4 +34,10 @@ namespace Sound {
 
     // Global volume (0-128 typical)
     void setMasterVolume(int volume);
+
+    // Category volumes (0-128), applied as attenuation only (never above 1.0)
+    // - Music volume applies immediately to the persistent music track
+    // - SFX volume applies to currently playing SFX tracks and new ones
+    void setMusicVolume(int volume);
+    void setSfxVolume(int volume);
 }

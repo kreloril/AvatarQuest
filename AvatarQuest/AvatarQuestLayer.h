@@ -56,6 +56,9 @@ private:
     Sound::Sfx* _testSfx = nullptr;
 	// Test music track (MP3)
 	Sound::Music* _testMusic = nullptr;
+	// Simple runtime volume controls
+	int _sfxVolume = 128;   // 0..128
+	int _musicVolume = 128; // 0..128
 #endif
 };
 

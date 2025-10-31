@@ -3,29 +3,74 @@
 
 #include <SDL3_mixer/SDL_mixer.h>
 #include <mutex>
+#include <atomic>
 
 namespace {
-    bool g_mixerInited = false;
-    MIX_Mixer* g_mixer = nullptr;
-    MIX_Track* g_musicTrack = nullptr;
-    Vector<Ref<Sound::Sfx>> g_sfx;
-    Vector<Ref<Sound::Music>> g_music;
-    Vector<MIX_Track*> g_trashTracks; // tracks to destroy on main thread
-    std::mutex g_trashMutex;
+    // Consolidated sound state container to avoid scattered globals
+    struct SoundState {
+        bool mixerInited = false;
+        MIX_Mixer* mixer = nullptr;
+        MIX_Track* musicTrack = nullptr;
+
+        Vector<Ref<Sound::Sfx>> sfx;
+        Vector<Ref<Sound::Music>> music;
+
+        // Tracks to destroy on main thread (queued from mixer thread)
+        Vector<MIX_Track*> trashTracks;
+        std::mutex trashMutex;
+
+        // Category gains (attenuation only). 1.0 = full volume, 0.0 = silent.
+        std::atomic<float> sfxGain{1.0f};    // multiplier for SFX
+        std::atomic<float> musicGain{1.0f};  // multiplier for music
+        float musicBaseGain = 1.0f;          // per-track base for current music
+
+        struct ActiveSfxTrack { MIX_Track* track; float baseGain; void* cbUser = nullptr; };
+        Vector<ActiveSfxTrack> activeSfxTracks;
+
+        void* musicCbUser = nullptr; // kept for symmetry, currently unused in callback
+    };
+
+    inline SoundState& SS() {
+        static SoundState s;
+        return s;
+    }
+
+    // Per-track cooked callbacks to apply gain without using MIX_SetTrackGain
+    void SDLCALL SfxCookedCB(void* userdata, MIX_Track* /*track*/, const SDL_AudioSpec* spec, float* pcm, int samples) {
+        if (!userdata || !pcm || !spec || samples <= 0) return;
+        const float base = *static_cast<const float*>(userdata);
+        const float cat = SS().sfxGain.load(std::memory_order_relaxed);
+        const float factor = base * cat;
+        if (factor == 1.0f) return;
+        const int total = samples * farmMax(1, spec->channels);
+        for (int i = 0; i < total; ++i) { pcm[i] *= factor; }
+    }
+
+    void SDLCALL MusicCookedCB(void* userdata, MIX_Track* /*track*/, const SDL_AudioSpec* spec, float* pcm, int samples) {
+        (void)userdata; // not used; we read state values instead
+        if (!pcm || !spec || samples <= 0) return;
+        const float cat = SS().musicGain.load(std::memory_order_relaxed);
+        const float factor = SS().musicBaseGain * cat;
+        if (factor == 1.0f) return;
+        const int total = samples * farmMax(1, spec->channels);
+        for (int i = 0; i < total; ++i) { pcm[i] *= factor; }
+    }
 
     // Auto-destroy tracks when they finish mixing
     void SDLCALL OnTrackStopped(void* userdata, MIX_Track* track) {
         (void)userdata;
         if (!track) return;
         // Don't destroy from mixer thread; queue for main-thread destruction.
-        std::scoped_lock<std::mutex> lock(g_trashMutex);
-        g_trashTracks.push_back(track);
+        auto& st = SS();
+        std::scoped_lock<std::mutex> lock(st.trashMutex);
+        st.trashTracks.push_back(track);
     }
 }
 
 bool Sound::init()
 {
-    if (g_mixerInited) {
+    auto& st = SS();
+    if (st.mixerInited) {
         return true;
     }
 
@@ -34,76 +79,89 @@ bool Sound::init()
         return false;
     }
 
-    g_mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
-    if (!g_mixer) {
+    st.mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
+    if (!st.mixer) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_CreateMixerDevice failed: %s", SDL_GetError());
         MIX_Quit();
         return false;
     }
 
     // Create a dedicated music track we can reuse
-    g_musicTrack = MIX_CreateTrack(g_mixer);
-    if (!g_musicTrack) {
+    st.musicTrack = MIX_CreateTrack(st.mixer);
+    if (!st.musicTrack) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_CreateTrack (music) failed: %s", SDL_GetError());
-        MIX_DestroyMixer(g_mixer);
-        g_mixer = nullptr;
+        MIX_DestroyMixer(st.mixer);
+        st.mixer = nullptr;
         MIX_Quit();
         return false;
     }
 
-    g_mixerInited = true;
+    st.mixerInited = true;
     return true;
 }
 
 void Sound::shutdown()
 {
-    if (!g_mixerInited) return;
+    auto& st = SS();
+    if (!st.mixerInited) return;
 
     // Stop music and close
-    if (g_musicTrack) {
+    if (st.musicTrack) {
         // stop immediately
-        MIX_StopTrack(g_musicTrack, 0);
-        MIX_DestroyTrack(g_musicTrack);
-        g_musicTrack = nullptr;
+        MIX_StopTrack(st.musicTrack, 0);
+        MIX_DestroyTrack(st.musicTrack);
+        st.musicTrack = nullptr;
     }
 
     // Free loaded audio
-    for (auto& s : g_sfx) {
+    for (auto& s : st.sfx) {
         if (s && s->handle) {
             MIX_DestroyAudio(s->handle);
             s->handle = nullptr;
         }
     }
-    g_sfx.clear();
+    st.sfx.clear();
 
-    for (auto& m : g_music) {
+    for (auto& m : st.music) {
         if (m && m->handle) {
             MIX_DestroyAudio(m->handle);
             m->handle = nullptr;
         }
     }
-    g_music.clear();
+    st.music.clear();
 
-    if (g_mixer) {
-        MIX_DestroyMixer(g_mixer);
-        g_mixer = nullptr;
+    if (st.mixer) {
+        // cleanup music callback userdata if any
+        if (st.musicCbUser) { delete static_cast<float*>(st.musicCbUser); st.musicCbUser = nullptr; }
+        MIX_DestroyMixer(st.mixer);
+        st.mixer = nullptr;
     }
 
     MIX_Quit();
-    g_mixerInited = false;
+    st.mixerInited = false;
 }
 
 void Sound::update()
 {
-    if (!g_mixerInited) return;
+    auto& st = SS();
+    if (!st.mixerInited) return;
     // Drain and destroy any finished SFX tracks queued by the mixer thread.
     Vector<MIX_Track*> toDestroy;
     {
-        std::scoped_lock<std::mutex> lock(g_trashMutex);
-        toDestroy.swap(g_trashTracks);
+        std::scoped_lock<std::mutex> lock(st.trashMutex);
+        toDestroy.swap(st.trashTracks);
     }
     for (auto* t : toDestroy) {
-        if (t && t != g_musicTrack) {
+        if (t && t != st.musicTrack) {
+            // remove from active SFX list if present
+            for (auto it = st.activeSfxTracks.begin(); it != st.activeSfxTracks.end(); ++it) {
+                if (it->track == t) {
+                    // free cooked-callback userdata
+                    if (it->cbUser) { delete static_cast<float*>(it->cbUser); it->cbUser = nullptr; }
+                    st.activeSfxTracks.erase(it);
+                    break;
+                }
+            }
             MIX_DestroyTrack(t);
         }
     }
@@ -111,12 +169,13 @@ void Sound::update()
 
 Sound::Sfx* Sound::loadSfx(const std::string& path)
 {
-    if (!g_mixerInited || !g_mixer) {
+    auto& st = SS();
+    if (!st.mixerInited || !st.mixer) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Sound::loadSfx called before Sound::init");
         return nullptr;
     }
 
-    MIX_Audio* audio = MIX_LoadAudio(g_mixer, path.c_str(), /*predecode*/ false);
+    MIX_Audio* audio = MIX_LoadAudio(st.mixer, path.c_str(), /*predecode*/ false);
     if (!audio) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_LoadAudio failed for '%s': %s", path.c_str(), SDL_GetError());
         return nullptr;
@@ -124,20 +183,21 @@ Sound::Sfx* Sound::loadSfx(const std::string& path)
 
     auto sfxRef = CreateRef<Sound::Sfx>();
     sfxRef->handle = audio;
-    g_sfx.push_back(sfxRef);
+    st.sfx.push_back(sfxRef);
     return sfxRef.get();
 }
 
 void Sound::unloadSfx(Sound::Sfx* s)
 {
     if (!s) return;
-    for (auto it = g_sfx.begin(); it != g_sfx.end(); ++it) {
+    auto& st = SS();
+    for (auto it = st.sfx.begin(); it != st.sfx.end(); ++it) {
         if (it->get() == s) {
             if ((*it)->handle) {
                 MIX_DestroyAudio((*it)->handle);
                 (*it)->handle = nullptr;
             }
-            g_sfx.erase(it);
+            st.sfx.erase(it);
             break;
         }
     }
@@ -145,12 +205,13 @@ void Sound::unloadSfx(Sound::Sfx* s)
 
 Sound::Music* Sound::loadMusic(const std::string& path)
 {
-    if (!g_mixerInited || !g_mixer) {
+    auto& st = SS();
+    if (!st.mixerInited || !st.mixer) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Sound::loadMusic called before Sound::init");
         return nullptr;
     }
 
-    MIX_Audio* audio = MIX_LoadAudio(g_mixer, path.c_str(), /*predecode*/ false);
+    MIX_Audio* audio = MIX_LoadAudio(st.mixer, path.c_str(), /*predecode*/ false);
     if (!audio) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_LoadAudio failed for '%s': %s", path.c_str(), SDL_GetError());
         return nullptr;
@@ -158,20 +219,21 @@ Sound::Music* Sound::loadMusic(const std::string& path)
 
     auto musicRef = CreateRef<Sound::Music>();
     musicRef->handle = audio;
-    g_music.push_back(musicRef);
+    st.music.push_back(musicRef);
     return musicRef.get();
 }
 
 void Sound::unloadMusic(Sound::Music* m)
 {
     if (!m) return;
-    for (auto it = g_music.begin(); it != g_music.end(); ++it) {
+    auto& st = SS();
+    for (auto it = st.music.begin(); it != st.music.end(); ++it) {
         if (it->get() == m) {
             if ((*it)->handle) {
                 MIX_DestroyAudio((*it)->handle);
                 (*it)->handle = nullptr;
             }
-            g_music.erase(it);
+            st.music.erase(it);
             break;
         }
     }
@@ -179,10 +241,13 @@ void Sound::unloadMusic(Sound::Music* m)
 
 bool Sound::playSfx(Sound::Sfx* s, int loops, int channel, int volume)
 {
+    auto& st = SS();
     (void)channel; // SDL_mixer 3.x doesn't have channel indices; we autogenerate tracks.
-    if (!g_mixerInited || !g_mixer || !s || !s->handle) return false;
+    // per-track volume (0..128) expressed as base gain [0..1]
+    float baseGain = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
+    if (!st.mixerInited || !st.mixer || !s || !s->handle) return false;
 
-    MIX_Track* track = MIX_CreateTrack(g_mixer);
+    MIX_Track* track = MIX_CreateTrack(st.mixer);
     if (!track) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_CreateTrack failed: %s", SDL_GetError());
         return false;
@@ -194,9 +259,12 @@ bool Sound::playSfx(Sound::Sfx* s, int loops, int channel, int volume)
         return false;
     }
 
-    // Set volume (gain)
-    float gain = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
-    MIX_SetTrackGain(track, gain);
+    // Use cooked-callback to scale samples; stash baseGain in heap
+    float* user = new float(baseGain);
+    MIX_SetTrackCookedCallback(track, SfxCookedCB, user);
+
+    // Track this SFX so future setSfxVolume() can adjust it
+    st.activeSfxTracks.push_back({ track, baseGain, user });
 
     // Auto-destroy when finished
     MIX_SetTrackStoppedCallback(track, OnTrackStopped, nullptr);
@@ -222,19 +290,24 @@ bool Sound::playSfx(Sound::Sfx* s, int loops, int channel, int volume)
 
 bool Sound::playMusic(Sound::Music* m, int loops, int volume)
 {
-    if (!g_mixerInited || !g_mixer || !g_musicTrack || !m || !m->handle) return false;
+    auto& st = SS();
+    if (!st.mixerInited || !st.mixer || !st.musicTrack || !m || !m->handle) return false;
 
-    if (!MIX_SetTrackAudio(g_musicTrack, m->handle)) {
+    if (!MIX_SetTrackAudio(st.musicTrack, m->handle)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_SetTrackAudio (music) failed: %s", SDL_GetError());
         return false;
     }
 
-    float gain = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
-    MIX_SetTrackGain(g_musicTrack, gain);
+    // per-track base gain from requested volume; apply via cooked callback
+    st.musicBaseGain = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
+    // free previous userdata if any
+    if (st.musicCbUser) { delete static_cast<float*>(st.musicCbUser); st.musicCbUser = nullptr; }
+    st.musicCbUser = nullptr; // not used by MusicCookedCB
+    MIX_SetTrackCookedCallback(st.musicTrack, MusicCookedCB, st.musicCbUser);
 
     SDL_PropertiesID opts = SDL_CreateProperties();
     SDL_SetNumberProperty(opts, MIX_PROP_PLAY_LOOPS_NUMBER, static_cast<Sint64>(loops));
-    bool ok = MIX_PlayTrack(g_musicTrack, opts);
+    bool ok = MIX_PlayTrack(st.musicTrack, opts);
     SDL_DestroyProperties(opts);
     if (!ok) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_PlayTrack (music) failed: %s", SDL_GetError());
@@ -245,19 +318,58 @@ bool Sound::playMusic(Sound::Music* m, int loops, int volume)
 
 void Sound::stopMusic(int fadeMs)
 {
-    if (!g_mixerInited || !g_musicTrack) return;
+    auto& st = SS();
+    if (!st.mixerInited || !st.musicTrack) return;
 
     Sint64 frames = 0;
     if (fadeMs > 0) {
-        frames = MIX_TrackMSToFrames(g_musicTrack, static_cast<Sint64>(fadeMs));
+        frames = MIX_TrackMSToFrames(st.musicTrack, static_cast<Sint64>(fadeMs));
         if (frames < 0) frames = 0; // fallback
     }
-    MIX_StopTrack(g_musicTrack, frames);
+    MIX_StopTrack(st.musicTrack, frames);
 }
 
 void Sound::setMasterVolume(int volume)
 {
-    if (!g_mixerInited || !g_mixer) return;
+    auto& st = SS();
+    if (!st.mixerInited || !st.mixer) return;
     float gain = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
-    MIX_SetMasterGain(g_mixer, gain);
+    MIX_SetMasterGain(st.mixer, gain);
+}
+
+void Sound::setMusicVolume(int volume)
+{
+    auto& st = SS();
+    if (!st.mixerInited) return;
+    float g = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
+    if (g > 1.0f) g = 1.0f; // attenuation only
+    st.musicGain = g;
+    if (st.musicTrack) {
+        float effective = st.musicBaseGain * st.musicGain;
+        if (effective < 1.0f) {
+            MIX_SetTrackGain(st.musicTrack, effective);
+        } else {
+            MIX_SetTrackGain(st.musicTrack, 1.0f);
+        }
+    }
+}
+
+void Sound::setSfxVolume(int volume)
+{
+    auto& st = SS();
+    if (!st.mixerInited) return;
+    float g = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
+    if (g > 1.0f) g = 1.0f; // attenuation only
+    st.sfxGain = g;
+    // Update currently playing SFX tracks (reapply base * category)
+    for (auto it = st.activeSfxTracks.begin(); it != st.activeSfxTracks.end(); ++it) {
+        if (it->track) {
+            float effective = it->baseGain * st.sfxGain;
+            if (effective < 1.0f) {
+                MIX_SetTrackGain(it->track, effective);
+            } else {
+                MIX_SetTrackGain(it->track, 1.0f);
+            }
+        }
+    }
 }

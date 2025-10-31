@@ -162,6 +162,9 @@ void AvatarQuestLayer::init()
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load test music (assets/mp3/way-home.mp3) from known locations.");
         }
     }
+    // Initialize category volumes
+    Sound::setSfxVolume(_sfxVolume);
+    Sound::setMusicVolume(_musicVolume);
 #endif
 
 
@@ -184,13 +187,35 @@ void AvatarQuestLayer::render(float deltaTime)
 
     // Draw a simple HUD overlay text in the top-left
     if (_hudFont) {
-        const std::string hud = "WASD to move   •   Esc to quit";
-        SDL_FRect size = Text::measure(_hudFont, hud);
         const float padX = 8.0f;
         const float padY = 6.0f;
+        const float lineGap = 2.0f;
+        const char* line1 = "WASD to move   •   Esc to quit";
+#ifdef AVATARQUEST_ENABLE_AUDIO
+        std::string line2 = "Space: SFX   •   P: play music   •   O: stop";
+        char buf[128] = {};
+        std::snprintf(buf, sizeof(buf), "SFX: %d/128   •   Music: %d/128", _sfxVolume, _musicVolume);
+        std::string line3 = buf;
+
+        SDL_FRect size1 = Text::measure(_hudFont, line1);
+        SDL_FRect size2 = Text::measure(_hudFont, line2);
+        SDL_FRect size3 = Text::measure(_hudFont, line3);
+        float width = std::max({ size1.w, size2.w, size3.w });
+        float height = size1.h + size2.h + size3.h + 2 * lineGap;
+
         // Background for readability
+        Renderer::drawFilledRect(8.0f - padX * 0.5f, 8.0f - padY * 0.5f, width + padX, height + padY, { 0,0,0,90 });
+        float y = 8.0f;
+        Text::draw(_hudFont, line1, 8.0f, y, SDL_Color{ 255,255,255,255 });
+        y += size1.h + lineGap;
+        Text::draw(_hudFont, line2, 8.0f, y, SDL_Color{ 220,220,220,255 });
+        y += size2.h + lineGap;
+        Text::draw(_hudFont, line3, 8.0f, y, SDL_Color{ 180,255,180,255 });
+#else
+        SDL_FRect size = Text::measure(_hudFont, line1);
         Renderer::drawFilledRect(8.0f - padX * 0.5f, 8.0f - padY * 0.5f, size.w + padX, size.h + padY, { 0,0,0,90 });
-        Text::draw(_hudFont, hud, 8.0f, 8.0f, SDL_Color{ 255,255,255,255 });
+        Text::draw(_hudFont, line1, 8.0f, 8.0f, SDL_Color{ 255,255,255,255 });
+#endif
     }
  //   Renderer::drawRect(tile->po, _playerstartY, tileSize, tileSize, { 0,255,0,255 });
 }
@@ -288,9 +313,38 @@ void AvatarQuestLayer::handleEvents(float /*delta*/, Game::GameEvents& events) {
                                 if (_testSfx) {
                                         // Play once at full volume
                                         Sound::playSfx(_testSfx, /*loops*/0, /*channel*/-1, /*volume*/128);
+										events.reset();
                                 }
                                 break;
                         }
+            case SDLK_F5: { // SFX volume -
+                _sfxVolume = std::max(0, _sfxVolume - 8);
+                Sound::setSfxVolume(_sfxVolume);
+                SDL_Log("SFX volume: %d", _sfxVolume);
+                events.reset();
+                break;
+            }
+            case SDLK_F6: { // SFX volume +
+                _sfxVolume = std::min(128, _sfxVolume + 8);
+                Sound::setSfxVolume(_sfxVolume);
+                SDL_Log("SFX volume: %d", _sfxVolume);
+                events.reset();
+                break;
+            }
+            case SDLK_F7: { // Music volume -
+                _musicVolume = std::max(0, _musicVolume - 8);
+                Sound::setMusicVolume(_musicVolume);
+                SDL_Log("Music volume: %d", _musicVolume);
+                events.reset();
+                break;
+            }
+            case SDLK_F8: { // Music volume +
+                _musicVolume = std::min(128, _musicVolume + 8);
+                Sound::setMusicVolume(_musicVolume);
+                SDL_Log("Music volume: %d", _musicVolume);
+                events.reset();
+                break;
+            }
             case SDLK_P: {
                 if (_testMusic) {
                     // Loop indefinitely at medium-high volume
