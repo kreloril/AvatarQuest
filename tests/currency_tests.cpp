@@ -99,3 +99,40 @@ TEST_CASE("Currency: sheet wallet add/spend integrates", "[currency][sheet]") {
     WARN("Tile set ->     " << bundleToString(getWallet(cs)));
     REQUIRE(getWallet(cs).tileID == 123);
 }
+
+TEST_CASE("Currency: transfer between character sheets", "[currency][sheet][transfer]") {
+    AvatarQuest::CharacterSheet a{};
+    AvatarQuest::CharacterSheet b{};
+    // Seed wallets
+    addFunds(a, CurrencyType::Gold, 10);
+    addFunds(a, CurrencyType::Food, 2);
+    addFunds(b, CurrencyType::Gold, 1);
+    WARN("A start: " << bundleToString(getWallet(a)));
+    WARN("B start: " << bundleToString(getWallet(b)));
+
+    // Transfer mixed bundle: 3 gold + 1 food
+    CurrencyBundle give{}; createPurse(3,1,0,0, give);
+    REQUIRE(transferFunds(a, b, give));
+    WARN("A after 3G1F -> B: " << bundleToString(getWallet(a)));
+    WARN("B after 3G1F <- A: " << bundleToString(getWallet(b)));
+    REQUIRE(toCopperTotal(getWallet(a)) == 7);
+    REQUIRE(toCopperTotal(getWallet(b)) == 4);
+
+    // A has only 1 food left; try to transfer 2 food (should fail, no change)
+    CurrencyBundle tooMuchFood{}; createPurse(0,2,0,0, tooMuchFood);
+    REQUIRE(!transferFunds(a, b, tooMuchFood));
+    REQUIRE(toCopperTotal(getWallet(a)) == 7);
+    REQUIRE(toCopperTotal(getWallet(b)) == 4);
+
+    // Transfer value-only: 5 gold from B to A (should fail; B has only 4)
+    REQUIRE_FALSE(transferFundsCopper(b, a, 5));
+    REQUIRE(toCopperTotal(getWallet(a)) == 7);
+    REQUIRE(toCopperTotal(getWallet(b)) == 4);
+
+    // Transfer 3 gold from B to A (succeeds)
+    REQUIRE(transferFundsCopper(b, a, 3));
+    WARN("A after +3G: " << bundleToString(getWallet(a)));
+    WARN("B after -3G: " << bundleToString(getWallet(b)));
+    REQUIRE(toCopperTotal(getWallet(a)) == 10);
+    REQUIRE(toCopperTotal(getWallet(b)) == 1);
+}
