@@ -124,13 +124,19 @@ TEST_CASE("Currency: transfer between character sheets", "[currency][sheet][tran
     REQUIRE(toCopperTotal(getWallet(a)) == 7);
     REQUIRE(toCopperTotal(getWallet(b)) == 4);
 
-    // Transfer value-only: 5 gold from B to A (should fail; B has only 4)
-    REQUIRE_FALSE(transferFundsCopper(b, a, 5));
+    // Transfer value-only via bundle: 5 gold from B to A (should fail; B has only 4)
+    {
+        CurrencyBundle fiveG{}; createPurse(5,0,0,0, fiveG);
+        REQUIRE_FALSE(transferFunds(b, a, fiveG));
+    }
     REQUIRE(toCopperTotal(getWallet(a)) == 7);
     REQUIRE(toCopperTotal(getWallet(b)) == 4);
 
     // Transfer 3 gold from B to A (succeeds)
-    REQUIRE(transferFundsCopper(b, a, 3));
+    {
+        CurrencyBundle threeG{}; createPurse(3,0,0,0, threeG);
+        REQUIRE(transferFunds(b, a, threeG));
+    }
     WARN("A after +3G: " << bundleToString(getWallet(a)));
     WARN("B after -3G: " << bundleToString(getWallet(b)));
     REQUIRE(toCopperTotal(getWallet(a)) == 10);
