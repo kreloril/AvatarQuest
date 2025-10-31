@@ -44,6 +44,8 @@ namespace  Renderer
 	void beginRender();
 	void endRender();
 	void setClearColor(Color color);
+	// Set the renderer's draw blend mode (e.g., SDL_BLENDMODE_NONE, _BLEND, _ADD, _MOD, _MUL)
+	void setBlendMode(SDL_BlendMode mode);
 	void drawPrimitiveList(const Vector<Vector2>& points, const Vector<int>& indices, Color color, float thickness = 1.0f);
 	SDL_Renderer* getRenderer();
 };

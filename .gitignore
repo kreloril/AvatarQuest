@@ -31,5 +31,6 @@ build/test_logs/
 Thumbs.db
 
 # Executables and logs
-AvatarQuest
+# Avoid ignoring source paths like include/AvatarQuest/; only ignore the built exe
+AvatarQuest.exe
 *.log

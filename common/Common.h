@@ -4,6 +4,7 @@
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_audio.h>
 
 
 #include <stdio.h>
@@ -98,6 +99,10 @@ inline auto farmMax(auto a, auto b) {
 #include "Helper.h"
 #include "AnimSerialization.h"
 #include "RenderGlyphs.h"
+#include "Text.h"
+#ifdef AVATARQUEST_ENABLE_AUDIO
+#include "Sound.h"
+#endif
 #include "UILayer.h"
 #include "Game.h"
 #include "Main.h"

@@ -17,6 +17,12 @@ bool Game::initGame(const char* settings)
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Renderer initialization failed.");
 		return false;
 	}
+	#ifdef AVATARQUEST_ENABLE_AUDIO
+	if (!Sound::init()) {
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Sound initialization failed.");
+		// Not fatal to the whole app; continue running without audio.
+	}
+	#endif
 	g_GameState.appInitialized = true;
 	Window::setWindowCallBackRender(Game::render);
 	Window::setWindowCallBackUpdate(Game::update);
@@ -26,6 +32,9 @@ bool Game::initGame(const char* settings)
 
 bool Game::shutDownGame()
 {
+	#ifdef AVATARQUEST_ENABLE_AUDIO
+	Sound::shutdown();
+	#endif
 	if (!Renderer::shutDownRenderer()) {
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Renderer shutdown failed.");
 		return false;
@@ -54,6 +63,9 @@ bool Game::runGameLoop()
 
 void Game::update(float deltaTime)
 {
+	#ifdef AVATARQUEST_ENABLE_AUDIO
+	Sound::update();
+	#endif
 	for (auto& layer : g_GameState._layers) {
 		layer->update(deltaTime);
 	}
