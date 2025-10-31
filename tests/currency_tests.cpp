@@ -17,7 +17,7 @@ static std::string bundleToString(const CurrencyBundle& b) {
         "Gold:%lld Food:%lld | totalValue:%lld | tileID:%d",
         (long long)count(CurrencyType::Gold),
         (long long)count(CurrencyType::Food),
-        (long long)toCopperTotal(b),
+    (long long)toValueTotal(b),
         b.tileID);
     return std::string(buf);
 }
@@ -26,11 +26,11 @@ TEST_CASE("Currency: gold totals and spend", "[currency]") {
     CurrencyBundle b{};
     createCurrency(CurrencyType::Gold, 3, /*tile*/-1, b);
     WARN("After create: " << bundleToString(b));
-    REQUIRE(toCopperTotal(b) == 3);
-    REQUIRE(spendCopper(b, 2) == true);
+    REQUIRE(toValueTotal(b) == 3);
+    REQUIRE(spendValue(b, 2) == true);
     WARN("After spend2: " << bundleToString(b));
-    REQUIRE(toCopperTotal(b) == 1);
-    REQUIRE(spendCopper(b, 2) == false);
+    REQUIRE(toValueTotal(b) == 1);
+    REQUIRE(spendValue(b, 2) == false);
 }
 
 TEST_CASE("Currency: food exact spend and affordability", "[currency]") {
@@ -42,7 +42,7 @@ TEST_CASE("Currency: food exact spend and affordability", "[currency]") {
     REQUIRE(spendBundle(wallet, eat));
     WARN("After:  " << bundleToString(wallet));
     // Value unchanged (food doesn't add to value), but food count reduced
-    REQUIRE(toCopperTotal(wallet) == 0);
+    REQUIRE(toValueTotal(wallet) == 0);
     // Spend more food than available should fail
     CurrencyBundle tooMuch{}; createPurse(0, 4, 0, 0, tooMuch);
     REQUIRE(!canAfford(wallet, tooMuch));
@@ -56,7 +56,7 @@ TEST_CASE("Currency: mixed costs (gold + food)", "[currency]") {
     REQUIRE(canAfford(wallet, cost));
     REQUIRE(spendBundle(wallet, cost));
     WARN("After:  " << bundleToString(wallet));
-    REQUIRE(toCopperTotal(wallet) == 5);
+    REQUIRE(toValueTotal(wallet) == 5);
     // Another food needed but none remains
     CurrencyBundle needFood{}; createPurse(0, 1, 0, 0, needFood);
     REQUIRE(!canAfford(wallet, needFood));
@@ -68,7 +68,7 @@ TEST_CASE("Currency: random purse scales with level on average", "[currency][ran
         int64_t sum = 0;
         for (int i = 0; i < 16; ++i) {
             CurrencyBundle b{}; createRandomPurse(level, b);
-            sum += toCopperTotal(b);
+            sum += toValueTotal(b);
         }
         return static_cast<double>(sum) / 16.0;
     };
@@ -81,18 +81,18 @@ TEST_CASE("Currency: random purse scales with level on average", "[currency][ran
 TEST_CASE("Currency: sheet wallet add/spend integrates", "[currency][sheet]") {
     AvatarQuest::CharacterSheet cs{};
     WARN("Initial wallet: " << bundleToString(getWallet(cs)));
-    REQUIRE(toCopperTotal(getWallet(cs)) == 0);
+    REQUIRE(toValueTotal(getWallet(cs)) == 0);
     // Add some funds
     addFunds(cs, CurrencyType::Gold, 10);
     addFunds(cs, CurrencyType::Food, 3);
     WARN("After add:      " << bundleToString(getWallet(cs)));
-    REQUIRE(toCopperTotal(getWallet(cs)) == 10);
+    REQUIRE(toValueTotal(getWallet(cs)) == 10);
     // Spend mixed
     CurrencyBundle cost{}; createPurse(2,1,0,0, cost); // 2 gold + 1 food
     WARN("Spend cost:     " << bundleToString(cost));
     REQUIRE(spendFunds(cs, cost));
     WARN("After spend:    " << bundleToString(getWallet(cs)));
-    REQUIRE(toCopperTotal(getWallet(cs)) == 8);
+    REQUIRE(toValueTotal(getWallet(cs)) == 8);
     // Tile stays as default unless explicitly set
     REQUIRE(getWallet(cs).tileID == -1);
     getWallet(cs).tileID = 123;
@@ -115,22 +115,22 @@ TEST_CASE("Currency: transfer between character sheets", "[currency][sheet][tran
     REQUIRE(transferFunds(a, b, give));
     WARN("A after 3G1F -> B: " << bundleToString(getWallet(a)));
     WARN("B after 3G1F <- A: " << bundleToString(getWallet(b)));
-    REQUIRE(toCopperTotal(getWallet(a)) == 7);
-    REQUIRE(toCopperTotal(getWallet(b)) == 4);
+    REQUIRE(toValueTotal(getWallet(a)) == 7);
+    REQUIRE(toValueTotal(getWallet(b)) == 4);
 
     // A has only 1 food left; try to transfer 2 food (should fail, no change)
     CurrencyBundle tooMuchFood{}; createPurse(0,2,0,0, tooMuchFood);
     REQUIRE(!transferFunds(a, b, tooMuchFood));
-    REQUIRE(toCopperTotal(getWallet(a)) == 7);
-    REQUIRE(toCopperTotal(getWallet(b)) == 4);
+    REQUIRE(toValueTotal(getWallet(a)) == 7);
+    REQUIRE(toValueTotal(getWallet(b)) == 4);
 
     // Transfer value-only via bundle: 5 gold from B to A (should fail; B has only 4)
     {
         CurrencyBundle fiveG{}; createPurse(5,0,0,0, fiveG);
         REQUIRE_FALSE(transferFunds(b, a, fiveG));
     }
-    REQUIRE(toCopperTotal(getWallet(a)) == 7);
-    REQUIRE(toCopperTotal(getWallet(b)) == 4);
+    REQUIRE(toValueTotal(getWallet(a)) == 7);
+    REQUIRE(toValueTotal(getWallet(b)) == 4);
 
     // Transfer 3 gold from B to A (succeeds)
     {
@@ -139,6 +139,6 @@ TEST_CASE("Currency: transfer between character sheets", "[currency][sheet][tran
     }
     WARN("A after +3G: " << bundleToString(getWallet(a)));
     WARN("B after -3G: " << bundleToString(getWallet(b)));
-    REQUIRE(toCopperTotal(getWallet(a)) == 10);
-    REQUIRE(toCopperTotal(getWallet(b)) == 1);
+    REQUIRE(toValueTotal(getWallet(a)) == 10);
+    REQUIRE(toValueTotal(getWallet(b)) == 1);
 }
