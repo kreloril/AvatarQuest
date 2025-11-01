@@ -186,6 +186,7 @@ int getEffectiveAttribute(const CharacterSheet& cs, AttributeType a) {
 AttributeType governingAttributeForSkill(SkillType type) {
     switch (type) {
         case SkillType::Attack:
+        case SkillType::DoubleAttack:
         case SkillType::Axes:
         case SkillType::Spears:
         case SkillType::Staves:
@@ -195,12 +196,16 @@ AttributeType governingAttributeForSkill(SkillType type) {
         case SkillType::Swords:
         case SkillType::Daggers:
         case SkillType::Bows:
+        case SkillType::Archery:
         case SkillType::Unarmed:
         case SkillType::Dodge:
         case SkillType::Parry:
         case SkillType::Riposte:
         case SkillType::LightArmor:
         case SkillType::Stealth:
+        case SkillType::Lockpicking:
+        case SkillType::TrapSetting:
+        case SkillType::Backstab:
             return AttributeType::Dexterity;
         case SkillType::FireMagic:
         case SkillType::IceMagic:
@@ -208,6 +213,8 @@ AttributeType governingAttributeForSkill(SkillType type) {
         case SkillType::PoisonMagic:
         case SkillType::Alchemy:
         case SkillType::Crafting:
+        case SkillType::TrapMaking:
+        case SkillType::Cooking:
             return AttributeType::Intelligence;
         case SkillType::Healing:
         case SkillType::Speech:

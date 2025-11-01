@@ -13,11 +13,14 @@ static Vector<SkillType> g_allSkillTypes = {
 	SkillType::Parry,
 	SkillType::Riposte,
 	SkillType::Block,
+	SkillType::Backstab,
+	SkillType::DoubleAttack,
 	SkillType::Swords,
 	SkillType::Axes,
 	SkillType::Spears,
 	SkillType::Daggers,
 	SkillType::Bows,
+	SkillType::Archery,
 	SkillType::Staves,
 	SkillType::Unarmed,
 	SkillType::Shields,
@@ -31,6 +34,10 @@ static Vector<SkillType> g_allSkillTypes = {
 	SkillType::Smithing,
 	SkillType::Alchemy,
 	SkillType::Stealth,
+	SkillType::Lockpicking,
+	SkillType::TrapSetting,
+	SkillType::TrapMaking,
+	SkillType::Cooking,
 	SkillType::Speech,
 	SkillType::Crafting,
 };
@@ -42,11 +49,14 @@ static const char* kSkillTypeNames[] = {
 	"Parry",
 	"Riposte",
 	"Block",
+	"Backstab",
+	"DoubleAttack",
 	"Swords",
 	"Axes",
 	"Spears",
 	"Daggers",
 	"Bows",
+	"Archery",
 	"Staves",
 	"Unarmed",
 	"Shields",
@@ -60,6 +70,10 @@ static const char* kSkillTypeNames[] = {
 	"Smithing",
 	"Alchemy",
 	"Stealth",
+	"Lockpicking",
+	"TrapSetting",
+	"TrapMaking",
+	"Cooking",
 	"Speech",
 	"Crafting",
 };
@@ -109,6 +123,7 @@ void createSkill(SkillType type, int levelRequirement, float rating, Ref<AvatarQ
 	// Assign a default governing attribute based on skill type
 	switch (type) {
 		case SkillType::Attack:
+		case SkillType::DoubleAttack:
 		case SkillType::Axes:
 		case SkillType::Spears:
 		case SkillType::Staves:
@@ -118,12 +133,16 @@ void createSkill(SkillType type, int levelRequirement, float rating, Ref<AvatarQ
 		case SkillType::Swords:
 		case SkillType::Daggers:
 		case SkillType::Bows:
+		case SkillType::Archery:
 		case SkillType::Unarmed:
 		case SkillType::Dodge:
 		case SkillType::Parry:
 		case SkillType::Riposte:
 		case SkillType::LightArmor:
 		case SkillType::Stealth:
+		case SkillType::Lockpicking:
+		case SkillType::TrapSetting:
+		case SkillType::Backstab:
 			outSkill->governingAttribute = AttributeType::Dexterity; break;
 		case SkillType::FireMagic:
 		case SkillType::IceMagic:
@@ -131,6 +150,8 @@ void createSkill(SkillType type, int levelRequirement, float rating, Ref<AvatarQ
 		case SkillType::PoisonMagic:
 		case SkillType::Alchemy:
 		case SkillType::Crafting:
+		case SkillType::TrapMaking:
+		case SkillType::Cooking:
 			outSkill->governingAttribute = AttributeType::Intelligence; break;
 		case SkillType::Healing:
 		case SkillType::Speech:

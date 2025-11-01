@@ -13,12 +13,15 @@ namespace AvatarQuest {
 		Parry,
 		Riposte,
 		Block,
+			Backstab,
+			DoubleAttack,
 		// Weapon skills
 		Swords,
 		Axes,
 		Spears,
 		Daggers,
 		Bows,
+			Archery,
 		Staves,
 		Unarmed,
 		// Defense/armor
@@ -34,7 +37,11 @@ namespace AvatarQuest {
 		// Non-combat
 		Smithing,
 		Alchemy,
-		Stealth,
+			Stealth,
+			Lockpicking,
+			TrapSetting,
+			TrapMaking,
+			Cooking,
 		Speech,
 		Crafting,
         

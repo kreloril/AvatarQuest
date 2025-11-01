@@ -149,6 +149,7 @@ void Renderer::drawImageFromRect(Vector2 position, Vector2 scale, float rotation
     SDL_RenderTextureRotated(g_RenderState.sdlRenderer, img->texture, &tileRect, &destRect, rotation, &center, SDL_FLIP_NONE);
 }
 
+
 bool Renderer::drawRect(float x, float y, float width, float height, Color color)
 {
     if (!g_RenderState.sdlRenderer) return false;

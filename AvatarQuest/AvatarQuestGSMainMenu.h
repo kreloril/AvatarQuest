@@ -2,23 +2,23 @@
 
 #include "Common.h"
 #include "AvatarQuestGameState.h"
-#include "Text.h"
+#include "AvatarQuestMenu.h"
 
 namespace AvatarQuest {
 
-class GSTitleScreen : public IGameState {
+class GSMainMenu : public IGameState {
 public:
-    GSTitleScreen() = default;
-    ~GSTitleScreen() override;
+    GSMainMenu() = default;
+    ~GSMainMenu() override = default;
 
     void onEnter() override;
     AQStateId handleEvents(float delta, Game::GameEvents& events) override;
     void render(float delta) override;
-    const char* name() const override { return "Title"; }
+    const char* name() const override { return "MainMenu"; }
 
 private:
     Text::Font* _titleFont = nullptr;
-    Text::Font* _promptFont = nullptr;
+    Menu _menu;
 };
 
 }

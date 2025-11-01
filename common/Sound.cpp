@@ -4,6 +4,7 @@
 #include <SDL3_mixer/SDL_mixer.h>
 #include <mutex>
 #include <atomic>
+#include <memory>
 
 namespace {
     // Consolidated sound state container to avoid scattered globals
@@ -24,7 +25,19 @@ namespace {
         std::atomic<float> musicGain{1.0f};  // multiplier for music
         float musicBaseGain = 1.0f;          // per-track base for current music
 
-        struct ActiveSfxTrack { MIX_Track* track; float baseGain; void* cbUser = nullptr; };
+        struct ActiveSfxTrack {
+            MIX_Track* track{};
+            float baseGain{};
+            std::unique_ptr<float> cbUser; // RAII for cooked-callback userdata
+
+            ActiveSfxTrack() = default;
+            ActiveSfxTrack(MIX_Track* t, float b, std::unique_ptr<float> u)
+                : track(t), baseGain(b), cbUser(std::move(u)) {}
+            ActiveSfxTrack(const ActiveSfxTrack&) = delete;
+            ActiveSfxTrack& operator=(const ActiveSfxTrack&) = delete;
+            ActiveSfxTrack(ActiveSfxTrack&&) noexcept = default;
+            ActiveSfxTrack& operator=(ActiveSfxTrack&&) noexcept = default;
+        };
         Vector<ActiveSfxTrack> activeSfxTracks;
 
         void* musicCbUser = nullptr; // kept for symmetry, currently unused in callback
@@ -105,6 +118,16 @@ void Sound::shutdown()
     auto& st = SS();
     if (!st.mixerInited) return;
 
+    // Stop and destroy any remaining SFX tracks; RAII will free cooked userdata
+    for (auto& a : st.activeSfxTracks) {
+        if (a.track) {
+            MIX_StopTrack(a.track, 0);
+            MIX_DestroyTrack(a.track);
+            a.track = nullptr;
+        }
+    }
+    st.activeSfxTracks.clear();
+
     // Stop music and close
     if (st.musicTrack) {
         // stop immediately
@@ -156,8 +179,6 @@ void Sound::update()
             // remove from active SFX list if present
             for (auto it = st.activeSfxTracks.begin(); it != st.activeSfxTracks.end(); ++it) {
                 if (it->track == t) {
-                    // free cooked-callback userdata
-                    if (it->cbUser) { delete static_cast<float*>(it->cbUser); it->cbUser = nullptr; }
                     st.activeSfxTracks.erase(it);
                     break;
                 }
@@ -259,12 +280,9 @@ bool Sound::playSfx(Sound::Sfx* s, int loops, int channel, int volume)
         return false;
     }
 
-    // Use cooked-callback to scale samples; stash baseGain in heap
-    float* user = new float(baseGain);
-    MIX_SetTrackCookedCallback(track, SfxCookedCB, user);
-
-    // Track this SFX so future setSfxVolume() can adjust it
-    st.activeSfxTracks.push_back({ track, baseGain, user });
+    // Use cooked-callback to scale samples; stash baseGain in RAII pointer
+    auto user = std::make_unique<float>(baseGain);
+    MIX_SetTrackCookedCallback(track, SfxCookedCB, user.get());
 
     // Auto-destroy when finished
     MIX_SetTrackStoppedCallback(track, OnTrackStopped, nullptr);
@@ -284,6 +302,9 @@ bool Sound::playSfx(Sound::Sfx* s, int loops, int channel, int volume)
         MIX_DestroyTrack(track);
         return false;
     }
+
+    // Track this SFX so future setSfxVolume() can adjust it
+    st.activeSfxTracks.emplace_back(track, baseGain, std::move(user));
 
     return true;
 }
@@ -311,6 +332,36 @@ bool Sound::playMusic(Sound::Music* m, int loops, int volume)
     SDL_DestroyProperties(opts);
     if (!ok) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_PlayTrack (music) failed: %s", SDL_GetError());
+        return false;
+    }
+    return true;
+}
+
+bool Sound::playMusicFadeIn(Sound::Music* m, int loops, int volume, int fadeInMs)
+{
+    auto& st = SS();
+    if (!st.mixerInited || !st.mixer || !st.musicTrack || !m || !m->handle) return false;
+
+    if (!MIX_SetTrackAudio(st.musicTrack, m->handle)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_SetTrackAudio (music) failed: %s", SDL_GetError());
+        return false;
+    }
+
+    // per-track base gain from requested volume; apply via cooked callback
+    st.musicBaseGain = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
+    if (st.musicCbUser) { delete static_cast<float*>(st.musicCbUser); st.musicCbUser = nullptr; }
+    st.musicCbUser = nullptr;
+    MIX_SetTrackCookedCallback(st.musicTrack, MusicCookedCB, st.musicCbUser);
+
+    SDL_PropertiesID opts = SDL_CreateProperties();
+    SDL_SetNumberProperty(opts, MIX_PROP_PLAY_LOOPS_NUMBER, static_cast<Sint64>(loops));
+    if (fadeInMs > 0) {
+        SDL_SetNumberProperty(opts, MIX_PROP_PLAY_FADE_IN_MILLISECONDS_NUMBER, static_cast<Sint64>(fadeInMs));
+    }
+    bool ok = MIX_PlayTrack(st.musicTrack, opts);
+    SDL_DestroyProperties(opts);
+    if (!ok) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "MIX_PlayTrack (music fade-in) failed: %s", SDL_GetError());
         return false;
     }
     return true;
@@ -344,14 +395,7 @@ void Sound::setMusicVolume(int volume)
     float g = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
     if (g > 1.0f) g = 1.0f; // attenuation only
     st.musicGain = g;
-    if (st.musicTrack) {
-        float effective = st.musicBaseGain * st.musicGain;
-        if (effective < 1.0f) {
-            MIX_SetTrackGain(st.musicTrack, effective);
-        } else {
-            MIX_SetTrackGain(st.musicTrack, 1.0f);
-        }
-    }
+    // No mixer-side gain changes; cooked callback scales samples using musicBaseGain * musicGain
 }
 
 void Sound::setSfxVolume(int volume)
@@ -361,15 +405,5 @@ void Sound::setSfxVolume(int volume)
     float g = static_cast<float>(farmMax(0, farmMin(volume, 128))) / 128.0f;
     if (g > 1.0f) g = 1.0f; // attenuation only
     st.sfxGain = g;
-    // Update currently playing SFX tracks (reapply base * category)
-    for (auto it = st.activeSfxTracks.begin(); it != st.activeSfxTracks.end(); ++it) {
-        if (it->track) {
-            float effective = it->baseGain * st.sfxGain;
-            if (effective < 1.0f) {
-                MIX_SetTrackGain(it->track, effective);
-            } else {
-                MIX_SetTrackGain(it->track, 1.0f);
-            }
-        }
-    }
+    // No per-track gain updates needed; cooked callback reads sfxGain atomically at mix time
 }

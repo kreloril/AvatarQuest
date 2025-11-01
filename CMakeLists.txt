@@ -19,7 +19,7 @@ endif()
 option(AVATARQUEST_ENABLE_AUDIO "Enable audio via SDL3_mixer" ${_AQ_AUDIO_DEFAULT})
 
 # Engine source files
-file(GLOB ENGINE_SRC
+file(GLOB ENGINE_SRC CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/common/*.cpp"
     "${CMAKE_SOURCE_DIR}/common/*.h"
 )
@@ -37,7 +37,7 @@ source_group("AvatarQuest" FILES
     ${GAME_SRC}
 )
 
-file(GLOB IMGUI_SRC
+file(GLOB IMGUI_SRC CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/external/imgui/*.cpp"
     "${CMAKE_SOURCE_DIR}/external/imgui/*.h"
 )
@@ -46,7 +46,7 @@ source_group("ImGui" FILES
     ${IMGUI_SRC}
 )
 
-file(GLOB OffenderEdit 
+file(GLOB OffenderEdit CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/OffenderEdit/*.cpp"
     "${CMAKE_SOURCE_DIR}/OffenderEdit/*.h"
 )
@@ -56,10 +56,12 @@ source_group("OffenderEdit" FILES
 )
 
 
-FILE(GLOB AvatarQuest
+FILE(GLOB AvatarQuest CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/AvatarQuest/*.cpp"
     "${CMAKE_SOURCE_DIR}/AvatarQuest/*.h"
 )
+
+# Note: UI controls implementation moved to common/
 
 source_group("AvatarQuest" FILES
     ${AvatarQuest}

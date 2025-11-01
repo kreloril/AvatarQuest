@@ -11,6 +11,7 @@ namespace Renderer
 	};
 
 
+
 	bool loadImageFromFile(const char* filename, Ref<Renderer::Image>&);
 	bool releaseImage(Ref<Renderer::Image>& img);
 

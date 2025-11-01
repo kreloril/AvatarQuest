@@ -30,6 +30,8 @@ namespace Sound {
     // channel: -1 picks first free channel
     bool playSfx(Sfx* s, int loops = 0, int channel = -1, int volume = 128);
     bool playMusic(Music* m, int loops = -1, int volume = 96);
+    // Convenience: play music with a fade-in over the specified milliseconds
+    bool playMusicFadeIn(Music* m, int loops = -1, int volume = 96, int fadeInMs = 250);
     void stopMusic(int fadeMs = 0);
 
     // Global volume (0-128 typical)

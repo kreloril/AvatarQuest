@@ -73,6 +73,9 @@ struct CharacterSheet {
 	} equipment;
 	// Wallet/currency carried by this character
 	CurrencyBundle wallet;
+	// Visual identity
+	bool isMale = true;       // selected gender
+	int portraitIndex = 0;    // selected portrait frame (0-based)
 };
 
 // Skill rating helpers (convenience overloads)

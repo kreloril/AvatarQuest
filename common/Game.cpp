@@ -32,6 +32,14 @@ bool Game::initGame(const char* settings)
 
 bool Game::shutDownGame()
 {
+	// First, let UI layers release their resources (fonts, textures, etc.)
+	for (auto& layer : g_GameState._layers) {
+		if (layer) {
+			layer->shutDown();
+		}
+	}
+	g_GameState._layers.clear();
+
 	#ifdef AVATARQUEST_ENABLE_AUDIO
 	Sound::shutdown();
 	#endif
